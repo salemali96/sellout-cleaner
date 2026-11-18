@@ -435,7 +435,14 @@ def mapping_editor(file: Path, raw_cols: list[str]) -> None:
     from src.agent import tools
 
     mapped = saved_mapping()
-    if tools.validate_mapping({r: c for r, c in mapped.items() if r in raw_cols}, raw_cols):
+    fits = not tools.validate_mapping({r: c for r, c in mapped.items() if r in raw_cols}, raw_cols)
+    guess = None if fits else tools.guess_mapping(raw_cols)
+    if guess:  # every header is a known name: map it with code, no AI request
+        tools.write_mapping(tools.mapping_from_columns(guess), MAPPING_PATH,
+                            f"# Matched by column names (no AI call) for {file.name}.\n")
+        st.session_state.flash = f"Recognised all {len(guess)} column names, no AI needed. Check the mapping below."
+        st.rerun()
+    if not fits:
         with st.container(border=True):
             st.markdown("**This file's column names don't match the saved mapping yet**, so the tool doesn't know "
                         "which column is the product, the store, the week, the units or the sales value.")

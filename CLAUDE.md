@@ -79,6 +79,8 @@ Phase 2: LLM agent (Phase 1 done: ingestion, split, core checks, Parquet output,
   only in `src.fixes.apply_plan`, which raises `ApprovalRequired` for unapproved risky ops.
 - Human decisions on risky fixes are remembered in `data/agent_memory.json` (`src/agent/memory.py`), as are fix plans
   of successful runs keyed by an issue fingerprint: identical issues replay the plan with no LLM call (`reuse_plan`).
+- Column mapping by name first: `tools.guess_mapping` (HEADER_SYNONYMS) maps known headers with no AI call; the Profiler
+  LLM runs only for unknown/ambiguous headers or `--remap`.
 - Token economy (`Session.lean`, default on): the cleaner's first message carries code-computed evidence
   (`tools.evidence`), fixes take `all_flagged` instead of long id lists, and a turn of only successful fixes ends
   the cleaner without a follow-up request.

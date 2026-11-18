@@ -5,6 +5,8 @@ Data changes only happen in `src.fixes.apply_plan`, which refuses risky ops that
 
 from __future__ import annotations
 
+import re
+
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -85,6 +87,57 @@ def validate_mapping(columns: dict[str, str], raw_cols: list[str]) -> list[str]:
     errors += [f"standard column {s!r} mapped more than once" for s in sorted(set(used)) if used.count(s) > 1]
     errors += [f"required standard column {s!r} is not mapped" for s in REQUIRED_STANDARD if s not in used]
     return errors
+
+
+# Common header names for each standard column, so typical files are mapped by code with no AI call.
+HEADER_SYNONYMS: dict[str, list[str]] = {
+    "product_id": ["sku", "sku code", "sku id", "item", "item #", "item no", "item number", "item code", "product code",
+                   "product id", "article", "article code", "material", "barcode", "ean"],
+    "product_name": ["product description", "product name", "item desc", "item description", "item name",
+                     "description", "article description", "sku name", "sku description"],
+    "brand": ["brand", "mfr brand", "manufacturer brand", "brand name"],
+    "category": ["category", "cat", "product category", "segment"],
+    "pack_size": ["pack size", "size", "pack", "package size"],
+    "uom": ["uom", "unit", "sell unit", "unit of measure", "sales unit"],
+    "units_per_case": ["units/case", "units per case", "pcs/ctn", "pcs per ctn", "case size", "case qty", "pack qty"],
+    "market_id": ["store code", "store id", "store no", "outlet id", "outlet code", "customer code", "branch code",
+                  "shop code", "market id"],
+    "market_name": ["store name", "store", "outlet", "outlet name", "customer name", "branch name", "shop name",
+                    "market name"],
+    "channel": ["channel", "trade channel", "sales channel"],
+    "region": ["region", "area", "governorate", "zone"],
+    "promo_id": ["promo id", "promo code", "promotion id", "promotion code", "promo"],
+    "promo_type": ["promo type", "promotion type", "mechanic", "promo mechanic"],
+    "promo_start_date": ["promo start", "promo from", "promo start date", "promotion start"],
+    "promo_end_date": ["promo end", "promo to", "promo end date", "promotion end"],
+    "week_raw": ["week", "period", "week no", "sales week", "fiscal week", "date", "week start"],
+    "units": ["sales qty", "qty sold", "quantity", "qty", "units", "units sold", "sales units", "volume"],
+    "value": ["sales value", "net sales", "value", "revenue", "sales amount", "amount", "net sales value"],
+}
+# Columns that carry no sales meaning; a file may have them and still be mapped by code.
+IGNORABLE_HEADERS = ["remarks", "remark", "comment", "comments", "notes", "note", "extract date", "export date",
+                     "load date", "load timestamp", "timestamp", "created at", "updated at", "source", "file name"]
+_CURRENCY = re.compile(r"\b(egp|usd|eur|gbp|sar|aed|le)\b")
+
+
+def _norm_header(header: str) -> str:
+    h = re.sub(r"\(.*?\)", "", header.lower())
+    return re.sub(r"[^a-z0-9\u0600-\u06ff]+", "", _CURRENCY.sub("", h))
+
+
+def guess_mapping(raw_cols: list[str]) -> dict[str, str] | None:
+    """Map headers by known names, with no AI. Returns None (ask the Profiler) unless every column is either matched
+    or clearly ignorable, no standard column is claimed twice, and all required columns are present."""
+    lookup = {_norm_header(n): std for std, names in HEADER_SYNONYMS.items() for n in [std, *names]}
+    ignorable = {_norm_header(n) for n in IGNORABLE_HEADERS}
+    cols: dict[str, str] = {}
+    for raw in raw_cols:
+        key = _norm_header(raw)
+        if key in lookup:
+            cols[raw] = lookup[key]
+        elif key not in ignorable:
+            return None
+    return cols if not validate_mapping(cols, raw_cols) else None
 
 
 def mapping_from_columns(columns: dict[str, str]) -> SchemaMapping:
