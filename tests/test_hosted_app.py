@@ -60,3 +60,35 @@ def test_old_workspaces_are_removed(hosted: Path) -> None:
     os.utime(old, (time.time() - 3 * 86400,) * 2)
     visit()
     assert not old.exists()
+
+
+def test_unfamiliar_columns_get_a_friendly_box_and_ai_mapping(hosted: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import sys
+    from types import SimpleNamespace
+
+    sys.path.insert(0, str(Path(APP).parent))
+    from scripts.make_challenge_data import RENAME, build
+    from src.agent import graph, tools
+
+    df, _ = build(600, 3)
+    csv = hosted / "challenge.csv"
+    csv.write_bytes(df.write_csv(separator=";").encode("utf-8-sig"))
+    standard = {"SKU Code": "product_id", "Product Description": "product_name", "Brand": "brand", "Category": "category",
+                "Pack Size": "pack_size", "UoM": "uom", "Units/Case": "units_per_case", "Store Code": "market_id",
+                "Store Name": "market_name", "Channel": "channel", "Region": "region", "Promo ID": "promo_id",
+                "Promo Type": "promo_type", "Promo Start": "promo_start_date", "Promo End": "promo_end_date",
+                "Week": "week_raw", "Sales Qty": "units", "Sales Value (EGP)": "value"}
+    answer = {RENAME[old]: std for old, std in standard.items()}
+    monkeypatch.setattr(providers, "make_llm", lambda *a, **k: SimpleNamespace())
+    monkeypatch.setattr(graph, "propose_mapping", lambda s, profile, cols: tools.MappingProposal(answer, [], ""))
+
+    at = AppTest.from_file(APP, default_timeout=60)
+    at.session_state["file"] = str(csv)
+    at.run()
+    assert not at.exception, at.exception
+    assert any("don't match the saved mapping" in m.value for m in at.markdown)
+    assert any("First tell the tool" in i.value for i in at.info)  # clean tab explains instead of failing
+    next(b for b in at.button if b.label == "🧭 Map columns with AI").click().run()
+    assert not at.exception, at.exception
+    assert not any("don't match the saved mapping" in m.value for m in at.markdown)
+    assert any(b.label == "Run cleaning" for b in at.button)

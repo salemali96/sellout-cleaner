@@ -394,13 +394,59 @@ def tab_data(file: Path) -> None:
     html(style.section("First 100 rows"))
     st.dataframe(lf.head(100).collect(), hide_index=True, width="stretch")
     html(style.section("Column mapping"))
-    mapping_editor(cols)
+    mapping_editor(file, cols)
 
 
-def mapping_editor(raw_cols: list[str]) -> None:
+def saved_mapping() -> dict[str, str]:
+    try:
+        return load_mapping(MAPPING_PATH).columns if MAPPING_PATH.exists() else {}
+    except Exception:  # noqa: BLE001 - an unreadable mapping counts as no mapping
+        return {}
+
+
+def mapping_fits(file: Path) -> bool:
     from src.agent import tools
 
-    mapped = load_mapping(MAPPING_PATH).columns if MAPPING_PATH.exists() else {}
+    raw_cols = raw_columns(scan_raw(file, load_rules().ingest, OUT_DIR / ".cache")[0])
+    return not tools.validate_mapping({r: c for r, c in saved_mapping().items() if r in raw_cols}, raw_cols)
+
+
+def ai_map(file: Path, raw_cols: list[str]) -> None:
+    """Ask the Profiler agent for a mapping of this file's columns (one AI call) and save it."""
+    from types import SimpleNamespace
+
+    from src.agent import graph, tools
+
+    with st.spinner("The Profiler is reading the columns and sample values..."):
+        try:
+            proposal = graph.propose_mapping(SimpleNamespace(llm=providers.make_llm("low")),
+                                             tools.profile_columns(file, load_rules()), raw_cols)
+        except Exception as e:  # noqa: BLE001 - provider errors, or no valid mapping after retries
+            st.error(providers.explain_error(e) if getattr(e, "status_code", None) else f"Could not map: {e}")
+            return
+    tools.write_mapping(tools.mapping_from_columns(proposal.columns), MAPPING_PATH,
+                        f"# Proposed by the Profiler agent for {file.name}. Review before trusting it.\n")
+    unsure = f" It was unsure about {len(proposal.low_confidence)} column(s): check them." if proposal.low_confidence else ""
+    st.session_state.flash = f"The Profiler mapped {len(proposal.columns)} columns.{unsure}"
+    st.rerun()
+
+
+def mapping_editor(file: Path, raw_cols: list[str]) -> None:
+    from src.agent import tools
+
+    mapped = saved_mapping()
+    if tools.validate_mapping({r: c for r, c in mapped.items() if r in raw_cols}, raw_cols):
+        with st.container(border=True):
+            st.markdown("**This file's column names don't match the saved mapping yet**, so the tool doesn't know "
+                        "which column is the product, the store, the week, the units or the sales value.")
+            if has_key():
+                st.caption("Let the Profiler agent read the column names and sample values and propose a mapping "
+                           "(one AI call), or set the 'standard column' for each row below yourself.")
+                if st.button("🧭 Map columns with AI", type="primary"):
+                    ai_map(file, raw_cols)
+            else:
+                st.caption("Connect an AI provider in the sidebar and the Profiler can map them for you. Or set the "
+                           "'standard column' for each row below yourself. Running the AI agents also maps them.")
     choices = ["ignore", *tools.STANDARD_COLUMNS]
     df = pl.DataFrame({"raw column": raw_cols, "standard column": [mapped.get(c, "ignore") for c in raw_cols],
                        "meaning": [tools.STANDARD_COLUMNS.get(mapped.get(c, ""), "") for c in raw_cols]})
@@ -410,8 +456,8 @@ def mapping_editor(raw_cols: list[str]) -> None:
                             column_config={"standard column": st.column_config.SelectboxColumn(options=choices)})
     cols = {r["raw column"]: r["standard column"] for r in edited.to_dicts() if r["standard column"] != "ignore"}
     errors = tools.validate_mapping(cols, raw_cols)
-    for e in errors:
-        st.warning(e)
+    if errors:
+        st.warning("Not ready to clean yet:\n" + "\n".join(f"- {e}" for e in errors))
     if cols != mapped and st.button("Save mapping", disabled=bool(errors)):
         tools.write_mapping(tools.mapping_from_columns(cols), MAPPING_PATH, "# Edited in the Sellout Cleaner app.\n")
         st.session_state.flash = ("Saved the mapping for this session." if HOSTED else
@@ -424,6 +470,10 @@ def mapping_editor(raw_cols: list[str]) -> None:
 def tab_rules(file: Path) -> None:
     st.write("Runs every check and safe fix with plain code. No AI, no API key, no cost. "
              "Error rows go to quarantine; warnings are kept and reported.")
+    if not mapping_fits(file):
+        st.info("First tell the tool what each column means: open the **📄 Data** tab and use **Map columns with "
+                "AI**, or set the mapping yourself. (The AI agents tab maps them automatically.)")
+        return
     if st.button("Run cleaning", type="primary"):
         with st.spinner("Cleaning..."):
             try:
