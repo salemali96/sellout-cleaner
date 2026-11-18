@@ -116,3 +116,6 @@ def test_known_header_names_are_mapped_without_ai(hosted: Path, monkeypatch: pyt
     assert not at.exception, at.exception
     assert not any("don't match the saved mapping" in m.value for m in at.markdown)
     assert any(b.label == "Run cleaning" for b in at.button)
+    next(b for b in at.button if b.label == "Run cleaning").click().run()  # results view in a hosted workspace
+    assert not at.exception, at.exception
+    assert any("Full files are in the Download tab" in c.value for c in at.caption)

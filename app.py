@@ -338,7 +338,8 @@ def show_table_explorer(folder: Path) -> None:
             pick = st.multiselect("Reason", sorted(df["rule_id"].unique().to_list()), key=f"q_{folder.name}")
             df = df.filter(pl.col("rule_id").is_in(pick)) if pick else df
         df = df.head(1000)
-    st.caption(f"Showing up to 1,000 rows. Full files are in {folder.relative_to(ROOT)}/")
+    where = "the Download tab" if HOSTED or not folder.is_relative_to(ROOT) else f"{folder.relative_to(ROOT)}/"
+    st.caption(f"Showing up to 1,000 rows. Full files are in {where}.")
     st.dataframe(df, hide_index=True, width="stretch")
 
 
