@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+data/raw/*
+data/output/*
+!data/raw/.gitkeep
+!data/output/.gitkeep
+.pytest_cache/
+data/agent_memory.json
+**/.cache/
+.env
+*.bak

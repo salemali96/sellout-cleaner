@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+.venv/
+**/__pycache__/
+.pytest_cache/
+data/raw/*
+data/output/*
+data/agent_memory.json
+**/.cache/
+*.bak
+tests/

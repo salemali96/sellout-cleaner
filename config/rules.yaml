@@ -1,0 +1,86 @@
+# Thresholds and strategies for checks and fixes. Never hard-code these in check functions.
+
+ingest:
+  sample_bytes: 1048576          # bytes read for encoding/delimiter detection
+  candidate_delimiters: [",", ";", "\t", "|"]
+  candidate_encodings: ["utf-8", "utf-8-sig", "cp1256", "latin-1"]
+
+# Values treated as null in every text column (compared after trimming, case-insensitive).
+null_placeholders: ["", "N/A", "NA", "-", "--", "NULL", "None", "#N/A", "?", "nan"]
+
+# Columns that are allowed to be empty (no placeholder warning). Promo fields are empty on non-promo rows.
+optional_columns: [promo_id, promo_type, promo_start_date, promo_end_date]
+
+# Columns that must be present on every row (error -> quarantine if null).
+required_columns: [product_id, market_id, week_raw, units, value]
+
+week:
+  start_day: monday              # ISO week; week_start_date is the Monday
+  six_digit_format: yyyyww       # "202503" means ISO year 2025, week 03
+  date_formats: ["%Y-%m-%d", "%d/%m/%Y"]
+
+dedup:
+  # Exact/identical duplicates are always dropped (kept once, extra copies go to quarantine).
+  # Same key but different values:
+  conflict_strategy: quarantine_both   # quarantine_both | keep_first | keep_last
+
+price:
+  outlier_tolerance: 0.5         # flag avg_price outside median * (1 +/- tolerance)
+  min_rows_for_median: 3         # products with fewer priced rows are not checked
+
+gaps:
+  enabled: true                  # report missing weeks inside each product x market series
+
+case_pack:
+  case_uom_values: ["CS", "CASE", "CTN"]
+  unit_uom_values: ["EA", "PC", "UNIT", "PCS"]
+
+market:
+  arabic_regex: "[؀-ۿ]"
+
+# Severity per rule. error = row goes to quarantine; warning = kept and reported.
+severity:
+  generic.missing_required: error
+  generic.null_placeholder: warning
+  sellout.unparseable_week: error
+  sellout.unparseable_number: error
+  sellout.exact_duplicate: error          # extra copies only; first copy is kept
+  sellout.duplicate_key_conflict: error
+  sellout.negative_value: warning
+  sellout.price_outlier: warning
+  sellout.missing_week: warning
+  sellout.case_pack_row: warning
+  product.conflicting_attribute: warning
+  product.invalid_units_per_case: warning
+  market.conflicting_name: warning
+  promo.invalid_date_range: warning
+  promo.conflicting_attribute: warning
+  cross_table.orphan_promo: warning
+  cross_table.orphan_product: error
+  cross_table.orphan_market: error
+
+# Rules that run. Remove an id to disable it.
+enabled_rules:
+  - generic.missing_required
+  - generic.null_placeholder
+  - sellout.unparseable_week
+  - sellout.unparseable_number
+  - sellout.exact_duplicate
+  - sellout.duplicate_key_conflict
+  - sellout.negative_value
+  - sellout.price_outlier
+  - sellout.missing_week
+  - sellout.case_pack_row
+  - product.conflicting_attribute
+  - product.invalid_units_per_case
+  - market.conflicting_name
+  - promo.invalid_date_range
+  - promo.conflicting_attribute
+  - cross_table.orphan_promo
+  - cross_table.orphan_product
+  - cross_table.orphan_market
+
+# Safe fixes are applied automatically (and logged). Risky fixes need human approval.
+fixes:
+  safe: [normalize_nulls, trim_whitespace, normalize_week, convert_case_pack]
+  risky: [merge_products, merge_markets, delete_rows]

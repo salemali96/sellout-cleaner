@@ -1,0 +1,37 @@
+# Raw column name -> standard column name.
+# Phase 2: the profiler agent generates this file; a human reviews/edits it.
+columns:
+  "SKU Code": product_id
+  "Product Description": product_name
+  "Brand": brand
+  "Category": category
+  "Pack Size": pack_size
+  "UoM": uom
+  "Units/Case": units_per_case
+  "Store Code": market_id
+  "Store Name": market_name
+  "Channel": channel
+  "Region": region
+  "Promo ID": promo_id
+  "Promo Type": promo_type
+  "Promo Start": promo_start_date
+  "Promo End": promo_end_date
+  "Week": week_raw
+  "Sales Qty": units
+  "Sales Value (EGP)": value
+
+# Which standard columns land in which output table.
+tables:
+  product:
+    key: [product_id]
+    attributes: [product_name, brand, category, pack_size, units_per_case]
+  market:
+    key: [market_id]
+    attributes: [market_name, channel, region]
+  promo:
+    key: [promo_id]
+    attributes: [promo_type, promo_start_date, promo_end_date]
+  sellout:
+    key: [product_id, market_id, week_start_date]
+    measures: [units, value]
+    foreign_keys: [promo_id]
