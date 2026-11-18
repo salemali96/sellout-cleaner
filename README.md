@@ -16,7 +16,7 @@ quarantine of bad rows with the reason for each, a data quality report and a pro
 was lost. Plain code does the checking and fixing; AI agents make the judgment calls; risky fixes wait for you.
 
 - **Clean (rules only)** needs no AI key.
-- **AI agents** and **Ask your data** need an AI provider. Several are free (Gemini, Groq, Hugging Face,
+- **AI agents** and **Ask your data** need an AI provider. Several are free (Gemini, Groq,
   OpenRouter, Mistral). Your key stays in your browser session only.
 - Uploaded files and results are private to your session and deleted after 24 hours.
 

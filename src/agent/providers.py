@@ -56,9 +56,10 @@ PROVIDERS: dict[str, Provider] = {p.id: p for p in [
              "One key for many models. Models ending in ':free' cost nothing."),
     Provider("mistral", "Mistral", "free tier", "MISTRAL_API_KEY", "https://api.mistral.ai/v1",
              "mistral-small-latest", "https://console.mistral.ai/api-keys", "Free 'Experiment' plan."),
-    Provider("huggingface", "Hugging Face", "free credits", "HF_TOKEN", "https://router.huggingface.co/v1",
+    Provider("huggingface", "Hugging Face", "needs credits", "HF_TOKEN", "https://router.huggingface.co/v1",
              "meta-llama/Llama-3.3-70B-Instruct", "https://huggingface.co/settings/tokens",
-             "Open models hosted by Hugging Face. Free token ('Read' is enough) with monthly free credits."),
+             "Open models hosted by Hugging Face. Calls need credits: since Oct 2026 free accounts get none (PRO "
+             "includes $2/month), so a new free account gets 'payment required'."),
     Provider("ollama", "Ollama (on this computer)", "local, free", None, "http://localhost:11434/v1",
              "qwen2.5:7b", "https://ollama.com/download",
              "Runs models on your own machine. No key, and no data leaves the computer. Hugging Face GGUF models work too: "
@@ -235,7 +236,8 @@ def explain_error(e: Exception, p: Provider | None = None, model: str | None = N
     elif code in (401, 403):
         msg = f"{p.label} rejected the key. Reconnect it in the sidebar."
     elif code == 402:
-        hint = " Hugging Face gives only a small free credit each month." if p.id == "huggingface" else ""
+        hint = (" Hugging Face free accounts get no AI credit (PRO includes a small monthly amount); see "
+                "huggingface.co/settings/billing." if p.id == "huggingface" else "")
         msg = (f"{p.label} wants payment for this request: the free credit is used up, or '{model}' is only on a "
                f"paid plan.{hint} Switch to a free provider such as Google Gemini or Groq in the sidebar.")
     elif code == 429:
