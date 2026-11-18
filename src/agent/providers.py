@@ -234,6 +234,10 @@ def explain_error(e: Exception, p: Provider | None = None, model: str | None = N
         msg = f"{p.label} does not offer the model '{model}' to your key. Pick another model in the sidebar."
     elif code in (401, 403):
         msg = f"{p.label} rejected the key. Reconnect it in the sidebar."
+    elif code == 402:
+        hint = " Hugging Face gives only a small free credit each month." if p.id == "huggingface" else ""
+        msg = (f"{p.label} wants payment for this request: the free credit is used up, or '{model}' is only on a "
+               f"paid plan.{hint} Switch to a free provider such as Google Gemini or Groq in the sidebar.")
     elif code == 429:
         msg = f"{p.label} rate limit or free quota reached. Wait a minute, or pick a smaller model."
     elif code in (500, 502, 503, 529):

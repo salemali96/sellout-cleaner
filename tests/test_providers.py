@@ -178,6 +178,9 @@ def test_errors_are_explained_in_plain_words() -> None:
     assert "does not offer the model 'gemini-old'" in msg and "no longer available" in msg
     assert "overloaded" in providers.explain_error(ApiError(503, {"error": {"message": "high demand"}}), gem, "m")
     assert "quota" in providers.explain_error(ApiError(429), gem, "m")
+    hf = providers.PROVIDERS["huggingface"]
+    paid = providers.explain_error(ApiError(402, {"error": "You have exceeded your monthly included credits."}), hf, "m")
+    assert "free credit is used up" in paid and "exceeded your monthly included credits" in paid
 
     class APITimeoutError(Exception):
         pass
